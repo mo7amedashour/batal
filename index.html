@@ -61,15 +61,17 @@ const dd=(a,dir)=>dir=='out'&&a>0?Math.round(a*S.ded)/100:0;
 const cn=()=>new Date(new Date().toLocaleString('en-US',{timeZone:'Africa/Cairo'}));
 const sod=()=>{const c=cn();return Date.now()-(c-new Date(c.getFullYear(),c.getMonth(),c.getDate()))},som=()=>{const c=cn();return Date.now()-(c-new Date(c.getFullYear(),c.getMonth(),1))};
 const net=(p,since=0)=>S.tx.filter(x=>p(x)&&x.t>=since).reduce((a,x)=>a+(x.dir=='in'?x.amt:-x.amt-(x.ded||0)),0);
-const used=(id,since)=>S.tx.filter(x=>x.sec=='vc'&&x.line==id&&x.t>=since&&!x.adj).reduce((a,x)=>a+x.amt,0);
+const used=(id,since,dir)=>S.tx.filter(x=>x.sec=='vc'&&x.line==id&&x.dir==dir&&x.t>=since&&!x.adj).reduce((a,x)=>a+x.amt,0);
 const tm=t=>new Date(t).toLocaleString('ar-EG',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
 const fee=a=>a<=0?0:a<S.fee.th?S.fee.lo:Math.ceil(a*S.fee.r/100/S.fee.s-1e-9)*S.fee.s;
 const rnd=c=>c%100==0?4:c%50==0?3:c%10==0?2:c%5==0?1:0;
 const feeIn=r=>{const a=fee(r);let b=0;for(let c=r;c>=1;c--)if(c+fee(c)<=r){b=r-c;break}return a<r&&rnd(r-a)>=rnd(r-b)?a:b};
 const opL=(sec,d)=>sec=='cash'?(d=='in'?'وارد':'صادر'):(d=='in'?'استلام':'تحويل');
 let delId=null;
-function status(l){const rd=S.lim.d-used(l.id,sod()),rm=S.lim.m-used(l.id,som()),pd=S.lim.d>0?rd/S.lim.d:1,pn=S.lim.m>0?rm/S.lim.m:1,p=Math.min(pd,pn),src=pd<=pn?'اليومي':'الشهري';
- const st=rd<0||rm<0?['تجاوز','bad']:rd==0||rm==0?['خلص','bad']:p<=.05?['على آخره','crit']:p<=.25?['قرّب','warn']:['تمام','ok'];return{rd,rm,pd,pn,p,src,st}}
+function status(l){const calc=dir=>{const rd=S.lim.d-used(l.id,sod(),dir),rm=S.lim.m-used(l.id,som(),dir);return{rd,rm,pd:S.lim.d>0?rd/S.lim.d:1,pn:S.lim.m>0?rm/S.lim.m:1}},o=calc('out'),i=calc('in');
+ const c=[[o.pd,'تحويل اليومي'],[o.pn,'تحويل الشهري'],[i.pd,'استلام اليومي'],[i.pn,'استلام الشهري']].reduce((a,x)=>x[0]<a[0]?x:a),p=c[0],src=c[1];
+ const z=[o.rd,o.rm,i.rd,i.rm].some(v=>v<=0);
+ const st=z?['خلص','bad']:p<=.05?['على آخره','crit']:p<=.25?['قرّب','warn']:['تمام','ok'];return{o,i,p,src,st}}
 const lc=(p,v)=>v<=0||p<=.05?'neg':p<=.25?'wnt':'';
 function recent(p){const a=S.tx.filter(p).slice(-10).reverse();
  if(!a.length)return'<div class="empty">مفيش معاملات لسه. سجّل أول معاملة من فوق.</div>';
@@ -84,7 +86,7 @@ async function txRun(e,sec){e.preventDefault();const fm=e.target,amt=+fm.amt.val
 function hint(fm){const h=fm.querySelector('.hint'),amt=+fm.amt.value,w=fm.dir.value=='in';
  if(!fm.fee.dataset.m)fm.fee.value=amt>0&&w?feeIn(amt):'';if(!(amt>0)){h.innerHTML='';return}
  const fe=+fm.fee.value||0,de=dd(amt,fm.dir.value),la=amt,cs=w?amt-fe:amt+fe;let m='';
- if(fm.dataset.s=='vc'){const s=status(S.lines.find(l=>l.id==+fm.line.value));if(la>s.rd)m='⚠ هيعدّي الليميت اليومي';else if(la>s.rm)m='⚠ هيعدّي الليميت الشهري'}
+ if(fm.dataset.s=='vc'){const s=status(S.lines.find(l=>l.id==+fm.line.value)),d=w?s.i:s.o,k=w?'الاستلام':'التحويل';if(la>d.rd)m='⚠ هيعدّي ليميت '+k+' اليومي';else if(la>d.rm)m='⚠ هيعدّي ليميت '+k+' الشهري'}
  h.innerHTML=(m?`<b class="neg">${m}</b><br>`:'')+`<span class="mut">الخط ${w?'يستلم':'يحوّل'} ${f(la)}${fm.link.checked?` · النقدي ${w?'يصرف':'يستلم'} ${f(cs)}`:''} ${de?` · خصم الشركة ${f(de)}`:''} · الربح ${f(fe-de)}</span>`}
 const opForm=sec=>`<form data-s="${sec}" onsubmit="return tx(event,'${sec}')" oninput="if(event.target.name=='fee')this.fee.dataset.m=1;hint(this)"><div class="row">
  ${sec=='vc'?`<label>الخط<select name="line" onchange="S.cur=+this.value;save()">${S.lines.map(l=>`<option value="${l.id}" ${l.id==S.cur?'selected':''}>${l.name}</option>`).join('')}</select></label>`:''}
@@ -93,11 +95,11 @@ const opForm=sec=>`<form data-s="${sec}" onsubmit="return tx(event,'${sec}')" on
  <label>الرسوم<input name="fee" type="number" min="0" step="any"></label>
  <label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" name="link" checked style="min-width:0">سجّل النقدي تلقائي</label>
  <button class="go">حفظ</button></div><div class="hint"></div></form>`;
-function vcView(){const rows=S.lines.map(l=>{const b=l.open+net(x=>x.sec=='vc'&&x.line==l.id),s=status(l),u=used(l.id,sod());
- return{l,b,u,...s,m:Math.min(s.rd,s.rm)}});
+function vcView(){const rows=S.lines.map(l=>{const b=l.open+net(x=>x.sec=='vc'&&x.line==l.id);
+ return{l,b,...status(l)}});
  return`<div class="card"><h2>تسجيل عملية</h2>${opForm('vc')}</div>
- <div class="card"><h2>الخطوط</h2><div class="tw"><table class="vt"><tr><th>الخط</th><th>الرصيد الافتتاحي</th><th>الرصيد الحالي</th><th>مستخدم النهارده</th><th>متبقي من اليومي</th><th>متبقي من الشهري</th><th></th></tr>
- ${rows.map(r=>`<tr class="r-${r.st[1]}"><td><input class="nm" value="${r.l.name}" onchange="renameLine(${r.l.id},this.value)"><span class="why">${r.src}: باقي ${Math.max(0,Math.round(r.p*100))}%</span></td><td><input type="number" step="any" value="${r.l.open}" style="width:110px;text-align:center" onchange="setLineOpen(${r.l.id},this.value)"></td><td>${f(r.b)}</td><td>${f(r.u)}</td><td class="${lc(r.pd,r.rd)}">${f(r.rd)}</td><td class="${lc(r.pn,r.rm)}">${f(r.rm)}</td>
+ <div class="card"><h2>الخطوط</h2><div class="tw"><table class="vt"><tr><th>الخط</th><th>الرصيد الافتتاحي</th><th>الرصيد الحالي</th><th>متبقي تحويل يومي</th><th>متبقي تحويل شهري</th><th>متبقي استلام يومي</th><th>متبقي استلام شهري</th><th></th></tr>
+ ${rows.map(r=>`<tr class="r-${r.st[1]}"><td><input class="nm" value="${r.l.name}" onchange="renameLine(${r.l.id},this.value)"><span class="why">${r.src}: باقي ${Math.max(0,Math.round(r.p*100))}%</span></td><td><input type="number" step="any" value="${r.l.open}" style="width:110px;text-align:center" onchange="setLineOpen(${r.l.id},this.value)"></td><td>${f(r.b)}</td><td class="${lc(r.o.pd,r.o.rd)}">${f(r.o.rd)}</td><td class="${lc(r.o.pn,r.o.rm)}">${f(r.o.rm)}</td><td class="${lc(r.i.pd,r.i.rd)}">${f(r.i.rd)}</td><td class="${lc(r.i.pn,r.i.rm)}">${f(r.i.rm)}</td>
  <td>${S.tx.some(x=>x.line==r.l.id)?'':`<button class="ghost" onclick="rmLine(${r.l.id})">حذف الخط</button>`}</td></tr>`).join('')}</table></div></div>
  <div class="card"><h2>إضافة خط</h2><form onsubmit="return addLine(event)"><div class="row"><label>اسم أو رقم الخط<input name="n" required></label><label>الرصيد الحالي<input name="o" type="number" value="0"></label><button class="go">أضف الخط</button></div></form></div>
  <div class="card"><h2>الليميتات والرسوم</h2><div class="mut">اليومي ${f(S.lim.d)} · الشهري ${f(S.lim.m)} · رسوم تحت ${f(S.fee.th)}: ${f(S.fee.lo)} · النسبة فوقها ${S.fee.r}% · بتتغير من الإدارة بس.</div></div>
