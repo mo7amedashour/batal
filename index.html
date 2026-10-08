@@ -45,7 +45,7 @@ th,td{padding:9px 8px;text-align:center;border-bottom:1px solid var(--bd);white-
 .vt tr.r-bad{background:var(--bdb);--c:var(--bd2)}
 .tag.crit{background:var(--bd2);color:var(--card)}
 .wnt{color:var(--wn);font-weight:700}
-.why{display:block;margin-top:3px;font-size:12px;color:var(--mut)}
+.why{display:block;margin-top:4px;font-size:13px;font-weight:700;color:var(--c,var(--mut))}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -69,8 +69,8 @@ const feeIn=r=>{const a=fee(r);let b=0;for(let c=r;c>=1;c--)if(c+fee(c)<=r){b=r-
 const opL=(sec,d)=>sec=='cash'?(d=='in'?'وارد':'صادر'):(d=='in'?'استلام':'تحويل');
 let delId=null;
 function status(l){const rd=S.lim.d-used(l.id,sod()),rm=S.lim.m-used(l.id,som()),pd=S.lim.d>0?rd/S.lim.d:1,pn=S.lim.m>0?rm/S.lim.m:1,p=Math.min(pd,pn),src=pd<=pn?'اليومي':'الشهري';
- const st=rd<0||rm<0?['تجاوز','bad']:rd==0||rm==0?['خلص','bad']:p<=.05?['على آخره','crit']:p<=.2?['قرّب','warn']:['تمام','ok'];return{rd,rm,pd,pn,p,src,st}}
-const lc=(p,v)=>v<=0||p<=.05?'neg':p<=.2?'wnt':'';
+ const st=rd<0||rm<0?['تجاوز','bad']:rd==0||rm==0?['خلص','bad']:p<=.05?['على آخره','crit']:p<=.25?['قرّب','warn']:['تمام','ok'];return{rd,rm,pd,pn,p,src,st}}
+const lc=(p,v)=>v<=0||p<=.05?'neg':p<=.25?'wnt':'';
 function recent(p){const a=S.tx.filter(p).slice(-10).reverse();
  if(!a.length)return'<div class="empty">مفيش معاملات لسه. سجّل أول معاملة من فوق.</div>';
  return'<div class="tw"><table><tr><th>الوقت</th><th>تفاصيل</th><th>العملية</th><th>المبلغ</th><th>الرسوم</th><th>خصم الشركة</th><th></th></tr>'+a.map(x=>{const l=S.lines.find(l=>l.id==x.line);
@@ -97,7 +97,7 @@ function vcView(){const rows=S.lines.map(l=>{const b=l.open+net(x=>x.sec=='vc'&&
  return{l,b,u,...s,m:Math.min(s.rd,s.rm)}});
  return`<div class="card"><h2>تسجيل عملية</h2>${opForm('vc')}</div>
  <div class="card"><h2>الخطوط</h2><div class="tw"><table class="vt"><tr><th>الخط</th><th>الرصيد الافتتاحي</th><th>الرصيد الحالي</th><th>مستخدم النهارده</th><th>متبقي من اليومي</th><th>متبقي من الشهري</th><th></th></tr>
- ${rows.map(r=>`<tr class="r-${r.st[1]}"><td><input class="nm" value="${r.l.name}" onchange="renameLine(${r.l.id},this.value)"><div style="margin-top:6px"><span class="tag ${r.st[1]}">${r.st[0]}</span>${r.st[1]=='warn'||r.st[1]=='crit'?`<span class="why">${r.src}: باقي ${Math.round(r.p*100)}%</span>`:r.st[1]=='bad'?`<span class="why">${r.src}</span>`:''}</div></td><td><input type="number" step="any" value="${r.l.open}" style="width:110px;text-align:center" onchange="setLineOpen(${r.l.id},this.value)"></td><td>${f(r.b)}</td><td>${f(r.u)}</td><td class="${lc(r.pd,r.rd)}">${f(r.rd)}</td><td class="${lc(r.pn,r.rm)}">${f(r.rm)}</td>
+ ${rows.map(r=>`<tr class="r-${r.st[1]}"><td><input class="nm" value="${r.l.name}" onchange="renameLine(${r.l.id},this.value)"><span class="why">${r.src}: باقي ${Math.max(0,Math.round(r.p*100))}%</span></td><td><input type="number" step="any" value="${r.l.open}" style="width:110px;text-align:center" onchange="setLineOpen(${r.l.id},this.value)"></td><td>${f(r.b)}</td><td>${f(r.u)}</td><td class="${lc(r.pd,r.rd)}">${f(r.rd)}</td><td class="${lc(r.pn,r.rm)}">${f(r.rm)}</td>
  <td>${S.tx.some(x=>x.line==r.l.id)?'':`<button class="ghost" onclick="rmLine(${r.l.id})">حذف الخط</button>`}</td></tr>`).join('')}</table></div></div>
  <div class="card"><h2>إضافة خط</h2><form onsubmit="return addLine(event)"><div class="row"><label>اسم أو رقم الخط<input name="n" required></label><label>الرصيد الحالي<input name="o" type="number" value="0"></label><button class="go">أضف الخط</button></div></form></div>
  <div class="card"><h2>الليميتات والرسوم</h2><div class="mut">اليومي ${f(S.lim.d)} · الشهري ${f(S.lim.m)} · رسوم تحت ${f(S.fee.th)}: ${f(S.fee.lo)} · النسبة فوقها ${S.fee.r}% · بتتغير من الإدارة بس.</div></div>
