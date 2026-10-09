@@ -10,7 +10,7 @@
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#170d0e;--card:#241617;--tx:#f3e9ea;--mut:#b39da0;--priT:#fff;--bd:#3d2a2c;--ok:#6fdc9f;--okb:#12392a;--wn:#ffd36b;--wnb:#3d3010;--bd2:#ff9a9d;--bdb:#431a1c;--p-vc:#d90f14;--p-ig:#8e44c4;--p-cash:#178a49;--p-net:#4f5260}}
 :root[data-theme="dark"]{--bg:#170d0e;--card:#241617;--tx:#f3e9ea;--mut:#b39da0;--priT:#fff;--bd:#3d2a2c;--ok:#6fdc9f;--okb:#12392a;--wn:#ffd36b;--wnb:#3d3010;--bd2:#ff9a9d;--bdb:#431a1c;--p-vc:#d90f14;--p-ig:#8e44c4;--p-cash:#178a49;--p-net:#4f5260}
 :root[data-theme="light"]{color-scheme:light}:root[data-theme="dark"]{color-scheme:dark}
-:root[data-sec="ig"]{--pri:var(--p-ig)}:root[data-sec="cash"]{--pri:var(--p-cash)}:root[data-sec="net"]{--pri:var(--p-net)}
+:root[data-sec="ig"]{--pri:var(--p-ig)}:root[data-sec="cash"]{--pri:var(--p-cash)}:root[data-sec="net"],:root[data-sec="jd"]{--pri:var(--p-net)}:root[data-sec="fw"]{--pri:#c26a00}:root[data-sec="aj"]{--pri:#1f5fa8}
 html{-webkit-text-size-adjust:100%}
 html,body{margin:0;height:auto;background:var(--bg);color:var(--tx);font-family:Tajawal,Tahoma,"Segoe UI",sans-serif;font-size:16px}
 button,input,select{touch-action:manipulation}
@@ -60,7 +60,7 @@ th,td{padding:9px 8px;text-align:center;border-bottom:1px solid var(--bd);white-
 <main id="app"></main>
 <script>
 const SB_URL='https://pzqifkaggvilzalnhaqt.supabase.co',SB_KEY='sb_publishable_z4W0iWdrogr2a76_A-6XIQ_eBtadqgo';
-const sb=supabase.createClient(SB_URL,SB_KEY);let ME=null,S={tab:'vc',per:'d',lines:[],tx:[],ig:0,cash:0,lim:{d:60000,m:200000},fee:{lo:5,th:1000,r:1,s:5},ded:0.1,edit:null};
+const sb=supabase.createClient(SB_URL,SB_KEY);let ME=null,S={tab:'vc',per:'d',lines:[],igs:[],fwm:[],fw:[],staff:[],cur:0,curIg:0,tx:[],cash:0,lim:{d:60000,m:200000},fee:{lo:5,th:1000,r:1,s:5},ded:0.1,edit:null};
 const save=()=>{};
 const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const TH=['auto','light','dark'],TL={auto:'🌓 تلقائي',light:'☀️ فاتح',dark:'🌙 داكن'};
@@ -78,78 +78,95 @@ const tm=t=>new Date(t).toLocaleString('ar-EG',{day:'numeric',month:'short',hour
 const fee=a=>a<=0?0:a<S.fee.th?S.fee.lo:Math.ceil(a*S.fee.r/100/S.fee.s-1e-9)*S.fee.s;
 const rnd=c=>c%100==0?4:c%50==0?3:c%10==0?2:c%5==0?1:0;
 const feeIn=r=>{const a=fee(r);let b=0;for(let c=r;c>=1;c--)if(c+fee(c)<=r){b=r-c;break}return a<r&&rnd(r-a)>=rnd(r-b)?a:b};
-const opL=(sec,d)=>sec=='cash'?(d=='in'?'وارد':'صادر'):(d=='in'?'استلام':'تحويل');
+const opL=(sec,d)=>sec=='cash'?(d=='in'?'وارد':'صادر'):sec=='ajil'?(d=='in'?'ليك':'عليك'):(d=='in'?'استلام':'تحويل');
+const M=()=>!!ME&&ME.role=='shop',ymd=t=>new Date(t).toLocaleDateString('en-CA',{timeZone:'Africa/Cairo'});
+const fwBal=()=>S.fwm.reduce((a,m)=>{const d=S.fw.find(d=>d.line==m.id);return a+(d?(d.closing??d.opening):0)},0),fwMove=sd=>S.fw.filter(d=>d.day>=sd&&d.closing!=null&&S.fwm.some(m=>m.id==d.line)).reduce((a,d)=>a+d.closing-d.opening,0);
 let delId=null;
 function status(l){const calc=dir=>{const rd=S.lim.d-used(l.id,sod(),dir),rm=S.lim.m-used(l.id,som(),dir);return{rd,rm,pd:S.lim.d>0?rd/S.lim.d:1,pn:S.lim.m>0?rm/S.lim.m:1}},o=calc('out'),i=calc('in');
  const c=[[o.pd,'تحويل اليومي'],[o.pn,'تحويل الشهري'],[i.pd,'استلام اليومي'],[i.pn,'استلام الشهري']].reduce((a,x)=>x[0]<a[0]?x:a),p=c[0],src=c[1];
  const z=[o.rd,o.rm,i.rd,i.rm].some(v=>v<=0);
  const st=z?['خلص','bad']:p<=.05?['على آخره','crit']:p<=.25?['قرّب','warn']:['تمام','ok'];return{o,i,p,src,st}}
 const lc=(p,v)=>v<=0||p<=.05?'neg':p<=.25?'wnt':'';
-function recent(p){const a=S.tx.filter(p).slice(-10).reverse();
+function recent(p){const a=S.tx.filter(p).slice(-10).reverse(),m=M(),L=[...S.lines,...S.igs];
  if(!a.length)return'<div class="empty">مفيش معاملات لسه. سجّل أول معاملة من فوق.</div>';
- return'<div class="tw"><table><tr><th>الوقت</th><th>تفاصيل</th><th>العملية</th><th>المبلغ</th><th>الرسوم</th><th>خصم الشركة</th><th></th></tr>'+a.map(x=>{const l=S.lines.find(l=>l.id==x.line);
- return`<tr><td>${tm(x.t)}</td><td>${x.sec=='vc'&&l?l.name:x.note||'-'}</td><td><span class="tag ${x.dir=='in'?'ok':'warn'}">${x.adj?'تسوية':x.cap?'رأس مال':opL(x.sec,x.dir)}</span></td><td>${f(x.amt)}</td><td>${x.fee?f(x.fee):'-'}</td><td>${x.ded?f(x.ded):'-'}</td><td>${x.auto?'<span class="mut">تلقائي</span>':`<button class="ghost" onclick="del(${x.id})">${delId==x.id?'تأكيد الحذف؟':'حذف'}</button>`}</td></tr>`}).join('')+'</table></div>'}
+ return'<div class="tw"><table><tr><th>الوقت</th><th>تفاصيل</th><th>العملية</th><th>المبلغ</th><th>الرسوم</th>'+(m?'<th>خصم الشركة</th><th></th>':'')+'</tr>'+a.map(x=>{const l=L.find(l=>l.id==x.line);
+ return`<tr><td>${tm(x.t)}</td><td>${(x.sec=='vc'||x.sec=='ig')&&l?l.name:x.note||'-'}</td><td><span class="tag ${x.dir=='in'?'ok':'warn'}">${x.adj?'تسوية':x.cap?'رأس مال':opL(x.sec,x.dir)}</span></td><td>${f(x.amt)}</td><td>${x.fee?f(x.fee):'-'}</td>${m?`<td>${x.ded?f(x.ded):'-'}</td><td>${x.auto?'<span class="mut">تلقائي</span>':`<button class="ghost" onclick="del(${x.id})">${delId==x.id?'تأكيد الحذف؟':'حذف'}</button>`}</td>`:''}</tr>`}).join('')+'</table></div>'}
 async function del(id){if(delId==id){await q(sb.from('transactions').delete().or(`id.eq.${id},ref.eq.${id}`));delId=null;await load()}else delId=id;render()}
 async function txRun(e,sec){e.preventDefault();const fm=e.target,amt=+fm.amt.value;if(!(amt>0))return false;const w=fm.dir.value=='in',sh=ME.shop_id;
- if(sec=='cash')await q(sb.from('transactions').insert({shop_id:sh,sec,dir:fm.dir.value,amt,note:'يدوي'}));
- else{const fe=+fm.fee.value||0,r=await q(sb.from('transactions').insert({shop_id:sh,sec,line_id:sec=='vc'?+fm.line.value:null,dir:fm.dir.value,amt,fee:fe,ded:dd(amt,fm.dir.value)}).select().single());
-  if(r.data&&fm.link.checked)await q(sb.from('transactions').insert({shop_id:sh,sec:'cash',dir:w?'out':'in',amt:w?amt-fe:amt+fe,auto:true,ref:r.data.id,note:(sec=='vc'?'فودافون كاش':'إنستا باي')+(w?' - استلام':' - تحويل')}))}
- if(sec=='vc')S.cur=+fm.line.value;await load();render();focusAmt();return false}
+ if(sec=='ajil')await q(sb.from('transactions').insert({shop_id:sh,sec,dir:fm.dir.value,amt,note:fm.who.value.trim()||'-'}));
+ else if(sec=='cash')await q(sb.from('transactions').insert({shop_id:sh,sec,dir:fm.dir.value,amt,note:'يدوي'}));
+ else{const fe=+fm.fee.value||0,r=await q(sb.from('transactions').insert({shop_id:sh,sec,line_id:+fm.line.value,dir:fm.dir.value,amt,fee:fe,ded:dd(amt,fm.dir.value)}).select().single());
+  if(r.data&&fm.link.checked)await q(sb.from('transactions').insert({shop_id:sh,sec:'cash',dir:w?'out':'in',amt:w?amt-fe:amt+fe,auto:true,ref:r.data.id,note:(sec=='vc'?'الكاش':'إنستا باي')+(w?' - استلام':' - تحويل')}))}
+ if(sec=='vc')S.cur=+fm.line.value;if(sec=='ig')S.curIg=+fm.line.value;await load();render();focusAmt();return false}
 function hint(fm){const h=fm.querySelector('.hint'),amt=+fm.amt.value,w=fm.dir.value=='in';
  if(!fm.fee.dataset.m)fm.fee.value=amt>0&&w?feeIn(amt):'';if(!(amt>0)){h.innerHTML='';return}
  const fe=+fm.fee.value||0,de=dd(amt,fm.dir.value),la=amt,cs=w?amt-fe:amt+fe;let m='';
  if(fm.dataset.s=='vc'){const s=status(S.lines.find(l=>l.id==+fm.line.value)),d=w?s.i:s.o,k=w?'الاستلام':'التحويل';if(la>d.rd)m='⚠ هيعدّي ليميت '+k+' اليومي';else if(la>d.rm)m='⚠ هيعدّي ليميت '+k+' الشهري'}
- h.innerHTML=(m?`<b class="neg">${m}</b><br>`:'')+`<span class="mut">الخط ${w?'يستلم':'يحوّل'} ${f(la)}${fm.link.checked?` · النقدي ${w?'يصرف':'يستلم'} ${f(cs)}`:''} ${de?` · خصم الشركة ${f(de)}`:''} · الربح ${f(fe-de)}</span>`}
-const opForm=sec=>`<form data-s="${sec}" onsubmit="return tx(event,'${sec}')" oninput="if(event.target.name=='fee')this.fee.dataset.m=1;hint(this)"><div class="row">
- ${sec=='vc'?`<label>الخط<select name="line" onchange="S.cur=+this.value;save()">${S.lines.map(l=>`<option value="${l.id}" ${l.id==S.cur?'selected':''}>${l.name}</option>`).join('')}</select></label>`:''}
+ h.innerHTML=(m?`<b class="neg">${m}</b><br>`:'')+`<span class="mut">الخط ${w?'يستلم':'يحوّل'} ${f(la)}${fm.link.checked?` · النقدي ${w?'يصرف':'يستلم'} ${f(cs)}`:''} ${de?` · خصم الشركة ${f(de)}`:''} · الربح ${f(fe-de)}</span>`}const opForm=sec=>`<form data-s="${sec}" onsubmit="return tx(event,'${sec}')" oninput="if(event.target.name=='fee')this.fee.dataset.m=1;hint(this)"><div class="row">
+ ${sec=='vc'||sec=='ig'?`<label>${sec=='ig'?'الحساب':'الخط'}<select name="line" onchange="S.${sec=='ig'?'curIg':'cur'}=+this.value">${(sec=='ig'?S.igs:S.lines).map(l=>`<option value="${l.id}" ${l.id==(sec=='ig'?S.curIg:S.cur)?'selected':''}>${l.name}</option>`).join('')}</select></label>`:''}
  <label>العملية<select name="dir"><option value="in">استلام</option><option value="out">تحويل</option></select></label>
  <label>المبلغ<input name="amt" type="number" min="1" step="any" inputmode="decimal"></label>
  <label>الرسوم<input name="fee" type="number" min="0" step="any"></label>
  <label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" name="link" checked style="min-width:0">سجّل النقدي تلقائي</label>
  <button class="go">حفظ</button></div><div class="hint"></div></form>`;
-function lineRow(r){const ed=S.edit==r.l.id,id=r.l.id;
+function lineRow(r){const ed=S.edit==r.l.id&&M(),id=r.l.id;
  return`<tr class="r-${r.st[1]}"><td>${ed?`<input class="nm" id="en${id}" value="${r.l.name}">`:`<b>${r.l.name}</b>`}<span class="why">${r.src}: باقي ${Math.max(0,Math.round(r.p*100))}%</span></td>
  <td>${ed?`<input type="number" step="any" id="eo${id}" value="${r.l.open}" style="width:110px;text-align:center">`:f(r.l.open)}</td><td>${f(r.b)}</td><td class="${lc(r.o.pd,r.o.rd)}">${f(r.o.rd)}</td><td class="${lc(r.o.pn,r.o.rm)}">${f(r.o.rm)}</td><td class="${lc(r.i.pd,r.i.rd)}">${f(r.i.rd)}</td><td class="${lc(r.i.pn,r.i.rm)}">${f(r.i.rm)}</td>
- <td>${ed?`<button class="go" style="padding:6px 14px" onclick="saveLine(${id})">حفظ</button> <button class="ghost" onclick="S.edit=null;render()">إلغاء</button>`:`<button class="ghost" onclick="S.edit=${id};render()">تعديل</button> ${S.tx.some(x=>x.line==id)?'':`<button class="ghost" onclick="rmLine(${id})">حذف الخط</button>`}`}</td></tr>`}
+ <td>${ed?`<button class="go" style="padding:6px 14px" onclick="saveLine(${id})">حفظ</button> <button class="ghost" onclick="S.edit=null;render()">إلغاء</button>`:M()?`<button class="ghost" onclick="S.edit=${id};render()">تعديل</button> ${S.tx.some(x=>x.line==id)?'':`<button class="ghost" onclick="rmLine(${id})">حذف الخط</button>`}`:''}</td></tr>`}
 function vcView(){const rows=S.lines.map(l=>{const b=l.open+net(x=>x.sec=='vc'&&x.line==l.id);
  return{l,b,...status(l)}});
  return`<div class="card"><h2>تسجيل عملية</h2>${opForm('vc')}</div>
  <div class="card"><h2>الخطوط</h2><div class="tw"><table class="vt"><tr><th>الخط</th><th>الرصيد الافتتاحي</th><th>الرصيد الحالي</th><th>متبقي تحويل يومي</th><th>متبقي تحويل شهري</th><th>متبقي استلام يومي</th><th>متبقي استلام شهري</th><th></th></tr>
  ${rows.map(lineRow).join('')}</table></div></div>
- <div class="card"><h2>إضافة خط</h2><form onsubmit="return addLine(event)"><div class="row"><label>اسم أو رقم الخط<input name="n" required></label><label>الرصيد الحالي<input name="o" type="number" value="0"></label><button class="go">أضف الخط</button></div></form></div>
- <div class="card"><h2>الليميتات والرسوم</h2><div class="mut">اليومي ${f(S.lim.d)} · الشهري ${f(S.lim.m)} · رسوم تحت ${f(S.fee.th)}: ${f(S.fee.lo)} · النسبة فوقها ${S.fee.r}% · بتتغير من الإدارة بس.</div></div>
- ${reconCard('vc')}
+ ${M()?`<div class="card"><h2>إضافة خط</h2><form onsubmit="return addLine(event,'vc')"><div class="row"><label>اسم أو رقم الخط<input name="n" required></label><label>الرصيد الحالي<input name="o" type="number" value="0"></label><button class="go">أضف الخط</button></div></form></div>
+ <div class="card"><h2>الليميتات والرسوم</h2><div class="mut">اليومي ${f(S.lim.d)} · الشهري ${f(S.lim.m)} · رسوم تحت ${f(S.fee.th)}: ${f(S.fee.lo)} · النسبة فوقها ${S.fee.r}% · بتتغير من الإدارة بس.</div></div>`:''}
  <div class="card"><h2>آخر المعاملات</h2>${recent(x=>x.sec=='vc')}</div>`}
-async function addLine(e){e.preventDefault();const fm=e.target;await q(sb.from('lines').insert({shop_id:ME.shop_id,name:fm.n.value.trim(),opening:+fm.o.value||0}));await load();render();return false}
+async function addLine(e,sec){e.preventDefault();const fm=e.target;await q(sb.from('lines').insert({shop_id:ME.shop_id,name:fm.n.value.trim(),opening:+fm.o.value||0,sec}));await load();render();return false}
 async function saveLine(id){const n=document.getElementById('en'+id).value.trim(),o=+document.getElementById('eo'+id).value||0;if(!n)return;await q(sb.from('lines').update({name:n,opening:o}).eq('id',id));S.edit=null;await load();render()}
 async function rmLine(id){await q(sb.from('lines').delete().eq('id',id));await load();render()}
-function accView(sec,key,title){const b=S[key]+net(x=>x.sec==sec);
- const fm=sec=='cash'?`<form onsubmit="return tx(event,'cash')"><div class="row"><label>النوع<select name="dir"><option value="in">وارد</option><option value="out">صادر</option></select></label><label>المبلغ<input name="amt" type="number" min="1" step="any" inputmode="decimal"></label><button class="go">حفظ</button></div></form>`:opForm('ig');
- return`<div class="grid" style="margin-bottom:14px"><div class="card" style="margin:0"><div class="mut">رصيد ${title} الحالي</div><div class="big">${f(b)}</div></div>
- <div class="card" style="margin:0"><form onsubmit="return saveOpen(event,'${key}')"><div class="row"><label>الرصيد الافتتاحي<input name="v" type="number" step="any" value="${S[key]}"></label><button class="ghost">حفظ</button></div></form></div></div>
- <div class="card"><h2>تسجيل ${sec=='cash'?'معاملة':'عملية'} - ${title}</h2>${fm}</div>
- ${reconCard(sec)}
- <div class="card"><h2>آخر المعاملات</h2>${recent(x=>x.sec==sec)}</div>`}
+function cashView(){const b=S.cash+net(x=>x.sec=='cash');
+ return`<div class="grid" style="margin-bottom:14px"><div class="card" style="margin:0"><div class="mut">رصيد النقدية الحالي</div><div class="big">${f(b)}</div></div>${M()?`<div class="card" style="margin:0"><form onsubmit="return saveOpen(event,'cash')"><div class="row"><label>الرصيد الافتتاحي<input name="v" type="number" step="any" value="${S.cash}"></label><button class="ghost">حفظ</button></div></form></div>`:''}</div>
+ <div class="card"><h2>تسجيل معاملة - النقدية</h2><form onsubmit="return tx(event,'cash')"><div class="row"><label>النوع<select name="dir"><option value="in">وارد</option><option value="out">صادر</option></select></label><label>المبلغ<input name="amt" type="number" min="1" step="any" inputmode="decimal"></label><button class="go">حفظ</button></div></form></div>
+ <div class="card"><h2>آخر المعاملات</h2>${recent(x=>x.sec=='cash')}</div>`}
 async function saveOpen(e,k){e.preventDefault();await q(sb.from('shops').update({[k=='ig'?'ig_open':'cash_open']:+e.target.v.value||0}).eq('id',ME.shop_id));await load();render();return false}
-function netMain(){const since=S.per=='d'?sod():S.per=='m'?som():0;
- const secs=[['vc','فودافون كاش'],['ig','إنستا باي'],['cash','نقدي']];
- const d=secs.map(([k,n])=>{const i=net(x=>x.sec==k&&x.dir=='in',since),o=-net(x=>x.sec==k&&x.dir=='out',since);return{n,i,o,v:i-o}});
- const mv=d.reduce((a,x)=>a+x.v,0),cap=net(x=>x.cap,since),profit=mv-cap,feeSum=S.tx.filter(x=>x.fee&&x.t>=since).reduce((a,x)=>a+x.fee,0),dedSum=S.tx.filter(x=>x.ded&&x.t>=since).reduce((a,x)=>a+x.ded,0),adj=net(x=>x.adj,since);
- const nowT=S.lines.reduce((a,l)=>a+l.open,0)+S.ig+S.cash+net(()=>true),startT=nowT-mv;
- return`<div class="card"><div class="row"><button class="ghost" onclick="exportCsv()">تصدير المعاملات (CSV)</button><label>الفترة<select onchange="S.per=this.value;save();render()"><option value="d" ${S.per=='d'?'selected':''}>اليوم</option><option value="m" ${S.per=='m'?'selected':''}>الشهر ده</option><option value="a" ${S.per=='a'?'selected':''}>من البداية</option></select></label></div></div>
- <div class="card" style="text-align:center"><div class="mut">صافي الربح</div><div class="big ${profit<0?'neg':''}" style="font-size:40px">${f(profit)} ج</div></div>
- <div class="card"><h2>الحساب</h2><div class="tw"><table><tr><th>القسم</th><th>داخل</th><th>خارج</th><th>الفرق</th></tr>
- ${d.map(x=>`<tr><td>${x.n}</td><td>${f(x.i)}</td><td>${f(x.o)}</td><td class="${x.v<0?'neg':''}">${f(x.v)}</td></tr>`).join('')}
- <tr><td><b>الإجمالي</b></td><td></td><td></td><td><b>${f(mv)}</b></td></tr></table></div>
- <p class="mut">إجمالي الأرصدة أول الفترة ${f(startT)}، والآن ${f(nowT)}. الفرق بينهم هو الربح بعد استبعاد رأس المال المضاف أو المسحوب (${f(cap)}). رسوم العمليات المسجلة: ${f(feeSum)}، فروق الجرد (داخلة في الربح): ${f(adj)}، وخصم الشركة على التحويلات: ${f(dedSum)}.</p></div>
- <div class="card"><h2>رأس مال أُضيف أو سُحب</h2><form onsubmit="return addCap(event)"><div class="row"><label>النوع<select name="k"><option value="1">أُضيف للمحل</option><option value="-1">سُحب من المحل</option></select></label><label>فين<select name="w"><option value="cash">النقدي</option><option value="ig">إنستا باي</option>${S.lines.map(l=>`<option value="vc:${l.id}">${l.name}</option>`).join('')}</select></label><label>المبلغ<input name="a" type="number" min="1" required></label><button class="go">سجّل</button></div></form></div>`}
+const addForm=sec=>`<div class="card"><h2>إضافة ${sec=='ig'?'حساب':'خط'}</h2><form onsubmit="return addLine(event,'${sec}')"><div class="row"><label>الاسم<input name="n" required></label><label>الرصيد الحالي<input name="o" type="number" value="0"></label><button class="go">إضافة</button></div></form></div>`;
+function igView(){const m=M(),rows=S.igs.map(a=>{const b=a.open+net(x=>x.sec=='ig'&&x.line==a.id),ed=S.edit==a.id&&m;
+ return`<tr><td>${ed?`<input class="nm" id="en${a.id}" value="${a.name}">`:`<b>${a.name}</b>`}</td><td>${ed?`<input type="number" step="any" id="eo${a.id}" value="${a.open}" style="width:110px;text-align:center">`:f(a.open)}</td><td>${f(b)}</td>${m?`<td>${ed?`<button class="go" style="padding:6px 14px" onclick="saveLine(${a.id})">حفظ</button> <button class="ghost" onclick="S.edit=null;render()">إلغاء</button>`:`<button class="ghost" onclick="S.edit=${a.id};render()">تعديل</button> ${S.tx.some(x=>x.line==a.id)?'':`<button class="ghost" onclick="rmLine(${a.id})">حذف</button>`}`}</td>`:''}</tr>`}).join('');
+ return`<div class="card"><h2>حسابات إنستا باي</h2>${S.igs.length?`<div class="tw"><table><tr><th>الحساب</th><th>الرصيد الافتتاحي</th><th>الرصيد الحالي</th>${m?'<th></th>':''}</tr>${rows}</table></div>`:'<div class="empty">مفيش حسابات لسه'+(m?'، أضف أول حساب من تحت.':'، كلّم المدير.')+'</div>'}</div>
+ ${S.igs.length?`<div class="card"><h2>تسجيل عملية</h2>${opForm('ig')}</div>`:''}${m?addForm('ig'):''}
+ <div class="card"><h2>آخر المعاملات</h2>${recent(x=>x.sec=='ig')}</div>`}
+function fwView(){const td=ymd(Date.now()),mg=M();
+ const cards=S.fwm.map(k=>{const t=S.fw.find(d=>d.day==td&&d.line==k.id)||{},last=S.fw.find(d=>d.line==k.id),b=last?(last.closing??last.opening):0;
+ return`<div class="card"><h2>${k.name} <span class="mut" style="font-size:14px">الرصيد الحالي: ${f(b)}</span>${mg&&!S.fw.some(d=>d.line==k.id)?` <button class="ghost" onclick="rmLine(${k.id})">حذف الماكينة</button>`:''}</h2><form onsubmit="return saveFw(event)"><input type="hidden" name="m" value="${k.id}"><div class="row"><label>الافتتاحي (أول اليوم)<input name="o" type="number" step="any" required value="${t.opening??''}"></label><label>الختامي (آخر اليوم)<input name="c" type="number" step="any" value="${t.closing??''}"></label><button class="go">حفظ</button></div></form></div>`}).join('');
+ return`<div class="card" style="text-align:center"><div class="mut">إجمالي أرصدة فوري</div><div class="big">${f(fwBal())}</div></div>
+ ${cards||'<div class="card empty">مفيش ماكينات لسه'+(mg?'، أضف أول ماكينة من تحت.':'، كلّم المدير.')+'</div>'}
+ ${mg?`<div class="card"><h2>إضافة ماكينة</h2><form onsubmit="return addLine(event,'fw')"><input type="hidden" name="o" value="0"><div class="row"><label>اسم الماكينة<input name="n" required></label><button class="go">إضافة</button></div></form></div>`:''}
+ <div class="card"><h2>آخر الأيام</h2>${S.fw.length?`<div class="tw"><table><tr><th>اليوم</th><th>الماكينة</th><th>افتتاحي</th><th>ختامي</th><th>الفرق</th></tr>${S.fw.slice(0,15).map(d=>{const v=d.closing==null?null:d.closing-d.opening,k=S.fwm.find(k=>k.id==d.line);return`<tr><td>${d.day}</td><td>${k?k.name:'-'}</td><td>${f(d.opening)}</td><td>${d.closing==null?'-':f(d.closing)}</td><td class="${v<0?'neg':''}">${v==null?'-':f(v)}</td></tr>`}).join('')}</table></div>`:'<div class="empty">مفيش أيام متسجلة لسه.</div>'}</div>`}
+async function saveFw(e){e.preventDefault();if(busy)return false;busy=true;try{const fm=e.target;await q(sb.from('fawry_days').upsert({shop_id:ME.shop_id,line_id:+fm.m.value,day:ymd(Date.now()),opening:+fm.o.value,closing:fm.c.value===''?null:+fm.c.value},{onConflict:'shop_id,day,line_id'}));await load();render()}finally{busy=false}return false}
+function ajView(){const A=S.tx.filter(x=>x.sec=='ajil'),my=A.filter(x=>x.dir=='in').reduce((a,x)=>a+x.amt,0),on=A.filter(x=>x.dir=='out').reduce((a,x)=>a+x.amt,0),P={};
+ A.forEach(x=>{const k=x.note||'-',p=P[k]||(P[k]=[0,0]);p[x.dir=='in'?0:1]+=x.amt});
+ return`<div class="grid" style="margin-bottom:14px"><div class="card" style="margin:0"><div class="mut">ليك (لينا عند الناس)</div><div class="big">${f(my)}</div></div><div class="card" style="margin:0"><div class="mut">عليك (علينا للناس)</div><div class="big">${f(on)}</div></div><div class="card" style="margin:0"><div class="mut">الصافي</div><div class="big ${my-on<0?'neg':''}">${f(my-on)}</div></div></div>
+ <div class="card"><h2>تسجيل آجل</h2><form onsubmit="return tx(event,'ajil')"><div class="row"><label>الاسم<input name="who" required></label><label>النوع<select name="dir"><option value="in">ليك (لينا عنده)</option><option value="out">عليك (علينا له)</option></select></label><label>المبلغ<input name="amt" type="number" min="1" step="any" inputmode="decimal"></label><button class="go">حفظ</button></div></form></div>
+ ${Object.keys(P).length?`<div class="card"><h2>الأسماء</h2><div class="tw"><table><tr><th>الاسم</th><th>ليك</th><th>عليك</th><th>الصافي</th></tr>${Object.entries(P).map(([k,v])=>`<tr><td>${k}</td><td>${f(v[0])}</td><td>${f(v[1])}</td><td class="${v[0]<v[1]?'neg':''}">${f(v[0]-v[1])}</td></tr>`).join('')}</table></div></div>`:''}
+ <div class="card"><h2>آخر المعاملات</h2>${recent(x=>x.sec=='ajil')}</div>`}
+function jdView(){const since=S.per=='d'?sod():S.per=='m'?som():0,PL={d:'اليوم',m:'الشهر ده',a:'من البداية'}[S.per],
+ R=[['الكاش',S.lines.reduce((a,l)=>a+l.open,0)+net(x=>x.sec=='vc')],['إنستا باي',S.igs.reduce((a,l)=>a+l.open,0)+net(x=>x.sec=='ig')],['فوري',fwBal()],['آجل',net(x=>x.sec=='ajil')],['النقدية',S.cash+net(x=>x.sec=='cash')]],T=R.reduce((a,x)=>a+x[1],0),
+ cap=net(x=>x.cap,since),profit=net(()=>true,since)+fwMove(ymd(since))-cap,feeSum=S.tx.filter(x=>x.fee&&x.t>=since).reduce((a,x)=>a+x.fee,0),dedSum=S.tx.filter(x=>x.ded&&x.t>=since).reduce((a,x)=>a+x.ded,0),adj=net(x=>x.adj,since);
+ return`<div class="card"><div class="row"><label>الفترة (للربح)<select onchange="S.per=this.value;render()"><option value="d" ${S.per=='d'?'selected':''}>اليوم</option><option value="m" ${S.per=='m'?'selected':''}>الشهر ده</option><option value="a" ${S.per=='a'?'selected':''}>من البداية</option></select></label></div></div>
+ <div class="card"><h2>الجرد</h2><div class="tw"><table><tr><th>القسم</th><th>المبلغ</th></tr>${R.map(([n,v])=>`<tr><td>${n}</td><td class="${v<0?'neg':''}">${f(v)}</td></tr>`).join('')}<tr><td><b>الإجمالي</b></td><td><b>${f(T)}</b></td></tr><tr><td><b>صافي الربح (${PL})</b></td><td class="${profit<0?'neg':''}"><b>${f(profit)} ج</b></td></tr></table></div>
+ <p class="mut">الربح = حركة كل الأقسام في الفترة بعد استبعاد رأس المال المضاف أو المسحوب (${f(cap)}). رسوم العمليات: ${f(feeSum)}، فروق الجرد (داخلة في الربح): ${f(adj)}، خصم الشركة: ${f(dedSum)}.</p></div>
+ ${reconCard('vc')}${reconCard('ig')}${reconCard('cash')}
+ <div class="card"><h2>رأس مال أُضيف أو سُحب</h2><form onsubmit="return addCap(event)"><div class="row"><label>النوع<select name="k"><option value="1">أُضيف للمحل</option><option value="-1">سُحب من المحل</option></select></label><label>فين<select name="w"><option value="cash">النقدية</option>${S.igs.map(l=>`<option value="ig:${l.id}">إنستا: ${l.name}</option>`).join('')}${S.lines.map(l=>`<option value="vc:${l.id}">${l.name}</option>`).join('')}</select></label><label>المبلغ<input name="a" type="number" min="1" required></label><button class="go">سجّل</button></div></form></div>
+ <div class="card"><h2>الموظفين</h2>${S.staff.map(u=>`<div class="row" style="margin-bottom:8px"><span>${esc(u.email)}</span><button class="ghost" onclick="rmStaff('${u.user_id}')">إزالة</button></div>`).join('')||'<div class="mut" style="margin-bottom:8px">مفيش موظفين لسه.</div>'}<form onsubmit="return addStaff(event)"><div class="row"><label>إيميل الموظف<input name="e" type="email" required></label><button class="go">إضافة</button></div><div class="hint neg" id="se"></div></form><div class="mut">اعمل حساب الموظف من Supabase (Authentication ثم Add user)، وبعدين اكتب إيميله هنا. الموظف بيسجل عمليات بس: من غير تعديل أو حذف أو ربح أو جرد.</div></div>
+ <div class="card"><div class="row"><button class="ghost" onclick="exportCsv()">تصدير المعاملات (CSV)</button></div></div>${dataCard()}`}
+async function addStaff(e){e.preventDefault();const r=await sb.rpc('add_staff',{p_email:e.target.e.value.trim()});if(r.error){document.getElementById('se').textContent=/auth/i.test(r.error.message)?'مفيش حساب بالإيميل ده. اعمله من Supabase الأول.':r.error.message;return false}await load();render();return false}
+async function rmStaff(id){await q(sb.rpc('remove_staff',{p_user:id}));await load();render()}
 async function addCap(e){e.preventDefault();const fm=e.target,[sec,ln]=fm.w.value.split(':'),k=+fm.k.value;await q(sb.from('transactions').insert({shop_id:ME.shop_id,sec,line_id:ln?+ln:null,dir:k>0?'in':'out',amt:+fm.a.value,cap:true,note:'رأس مال'}));await load();render();return false}
-function netView(){return netMain()+dataCard()}
-function render(){const T=[['vc','فودافون كاش'],['ig','إنستا باي'],['cash','نقدي'],['net','الصافي']];
+function render(){const T=[['vc','الكاش'],['ig','إنستا باي'],['fw','فوري'],['aj','آجل'],...(M()?[['jd','الجرد']]:[]),['cash','النقدية']];
  const sc=[...document.querySelectorAll('.tw')].map(e=>e.scrollLeft);
  document.documentElement.dataset.sec=S.tab;
  document.getElementById('nav').innerHTML=T.map(([k,n])=>`<button class="${S.tab==k?'on':''}" onclick="go('${k}')">${n}</button>`).join('');
- document.getElementById('app').innerHTML=S.tab=='vc'?vcView():S.tab=='ig'?accView('ig','ig','إنستا باي'):S.tab=='cash'?accView('cash','cash','النقدي'):netView();
+ document.getElementById('app').innerHTML=({vc:vcView,ig:igView,fw:fwView,aj:ajView,jd:jdView,cash:cashView}[S.tab]||vcView)();
  document.querySelectorAll('.tw').forEach((e,i)=>{if(sc[i])e.scrollLeft=sc[i]})}
 const focusAmt=()=>{if(matchMedia('(pointer:coarse)').matches)return;const i=document.querySelector('input[name=amt]');if(i)i.focus()};
 function go(k){S.edit=null;S.tab=k;save();render();focusAmt()}
@@ -162,23 +179,22 @@ const q=async p=>{const r=await p;if(r.error){if(/JWT|expired/i.test(r.error.mes
 const hd=document.querySelector('header'),app=document.getElementById('app');
 let busy=false;
 async function tx(e,sec){e.preventDefault();if(busy)return false;busy=true;try{await txRun(e,sec)}finally{busy=false}return false}
-const balOf=(sec,line)=>sec=='vc'?((S.lines.find(l=>l.id==line)||{open:0}).open+net(x=>x.sec=='vc'&&x.line==line)):S[sec]+net(x=>x.sec==sec);
+const balOf=(sec,line)=>sec=='cash'?S.cash+net(x=>x.sec=='cash'):((S[sec=='ig'?'igs':'lines'].find(l=>l.id==line)||{open:0}).open+net(x=>x.sec==sec&&x.line==line));
 const diffOf=r=>Math.round((r.actual-balOf(r.sec,r.line))*100)/100;
-function reconCard(sec){const r=S.rc&&S.rc.sec==sec?S.rc:null,tt={vc:'خط فودافون كاش',ig:'إنستا باي',cash:'النقدي'}[sec];let res='';
+function reconCard(sec){const r=S.rc&&S.rc.sec==sec?S.rc:null,tt={vc:'خط الكاش',ig:'إنستا باي',cash:'النقدي'}[sec];let res='';
  if(r){const d=diffOf(r),a=Math.abs(d);res=d==0?'<div class="hint"><b style="color:var(--ok)">الرصيد مطابق ✅</b></div>':`<div class="hint"><b class="${a>50?'neg':''}">الفرق: ${d>0?'زيادة':'نقص'} ${f(a)} ج${a>50?' ⚠ الفرق كبير، راجع العمليات الأول':''}</b><div class="row" style="margin-top:8px"><button class="go" onclick="applyRecon()">ثبّت التسوية</button><button class="ghost" onclick="S.rc=null;render()">إلغاء</button></div></div>`}
- return`<div class="card"><h2>جرد ${tt}</h2><form onsubmit="return recon(event,'${sec}')"><div class="row">${sec=='vc'?`<label>الخط<select name="line" onchange="S.cur=+this.value">${S.lines.map(l=>`<option value="${l.id}" ${l.id==S.cur?'selected':''}>${l.name}</option>`).join('')}</select></label>`:''}<label>الرصيد الفعلي<input name="a" type="number" step="any" required></label><button class="go">قارن</button></div></form>${res}</div>`}
-function recon(e,sec){e.preventDefault();const fm=e.target;S.rc={sec,line:sec=='vc'?+fm.line.value:null,actual:+fm.a.value};render();return false}
-async function applyRecon(){const r=S.rc;if(!r||busy)return;const d=diffOf(r);if(d==0){S.rc=null;return render()}busy=true;await q(sb.from('transactions').insert({shop_id:ME.shop_id,sec:r.sec,line_id:r.line,dir:d>0?'in':'out',amt:Math.abs(d),adj:true,note:'تسوية جرد'}));busy=false;S.rc=null;await load();render()}
-function exportCsv(){const since=S.per=='d'?sod():S.per=='m'?som():0,SN={vc:'فودافون كاش',ig:'إنستا باي',cash:'نقدي'},E=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
- const rows=S.tx.filter(x=>x.t>=since).map(x=>{const l=S.lines.find(l=>l.id==x.line);return[new Date(x.t).toLocaleString('en-GB',{timeZone:'Africa/Cairo'}),SN[x.sec],l?l.name:'',x.adj?'تسوية':x.cap?'رأس مال':opL(x.sec,x.dir),x.amt,x.fee||0,x.ded||0,x.note||''].map(E).join(',')});
+ return`<div class="card"><h2>جرد ${tt}</h2><form onsubmit="return recon(event,'${sec}')"><div class="row">${sec=='vc'||sec=='ig'?`<label>${sec=='ig'?'الحساب':'الخط'}<select name="line" onchange="S.cur${sec=='ig'?'Ig':''}=+this.value">${(sec=='ig'?S.igs:S.lines).map(l=>`<option value="${l.id}" ${l.id==S.cur?'selected':''}>${l.name}</option>`).join('')}</select></label>`:''}<label>الرصيد الفعلي<input name="a" type="number" step="any" required></label><button class="go">قارن</button></div></form>${res}</div>`}
+function recon(e,sec){e.preventDefault();const fm=e.target;S.rc={sec,line:sec=='vc'||sec=='ig'?+fm.line.value:null,actual:+fm.a.value};render();return false}
+async function applyRecon(){const r=S.rc;if(!r||busy)return;const d=diffOf(r);if(d==0){S.rc=null;return render()}busy=true;await q(sb.from('transactions').insert({shop_id:ME.shop_id,sec:r.sec,line_id:r.line,dir:d>0?'in':'out',amt:Math.abs(d),adj:true,note:'تسوية جرد'}));busy=false;S.rc=null;await load();render()}function exportCsv(){const since=S.per=='d'?sod():S.per=='m'?som():0,SN={vc:'الكاش',ig:'إنستا باي',cash:'النقدية',ajil:'آجل'},E=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+ const rows=S.tx.filter(x=>x.t>=since).map(x=>{const l=[...S.lines,...S.igs].find(l=>l.id==x.line);return[new Date(x.t).toLocaleString('en-GB',{timeZone:'Africa/Cairo'}),SN[x.sec],l?l.name:'',x.adj?'تسوية':x.cap?'رأس مال':opL(x.sec,x.dir),x.amt,x.fee||0,x.ded||0,x.note||''].map(E).join(',')});
  const csv='\ufeff'+['التاريخ,القسم,الخط,العملية,المبلغ,الرسوم,خصم الشركة,ملاحظة',...rows].join('\n');
  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download='transactions.csv';a.click()}
-async function load(){const id=ME.shop_id,[a,b,c,d]=await Promise.all([sb.from('shops').select('*').eq('id',id).single(),sb.from('shop_limits').select('*').eq('shop_id',id).single(),sb.from('lines').select('*').eq('shop_id',id).order('id'),sb.from('transactions').select('*').eq('shop_id',id).order('id').range(0,19999)]);
+async function load(){const id=ME.shop_id,[a,b,c,d,e]=await Promise.all([sb.from('shops').select('*').eq('id',id).single(),sb.from('shop_limits').select('*').eq('shop_id',id).single(),sb.from('lines').select('*').eq('shop_id',id).order('id'),sb.from('transactions').select('*').eq('shop_id',id).order('id').range(0,19999),sb.from('fawry_days').select('*').eq('shop_id',id).order('day',{ascending:false}).limit(400)]);
  if(a.error||b.error||c.error||d.error)return;
  S.lim={d:+b.data.limit_day,m:+b.data.limit_month};S.fee={lo:+b.data.fee_low,th:+b.data.fee_th,r:+b.data.fee_rate,s:+b.data.fee_step};S.ded=+b.data.ded_rate;
- S.name=a.data.name;S.ig=+a.data.ig_open;S.cash=+a.data.cash_open;shop.textContent=S.name;document.title=S.name;
- S.raw={shop:a.data,limits:b.data,lines:c.data,tx:d.data};
- S.lines=c.data.map(l=>({id:l.id,name:esc(l.name),open:+l.opening}));
+ S.name=a.data.name;S.cash=+a.data.cash_open;shop.textContent=S.name;document.title=S.name;
+ S.raw={shop:a.data,limits:b.data,lines:c.data,tx:d.data,fawry:e.error?[]:e.data};
+ const LL=c.data.map(l=>({id:l.id,name:esc(l.name),open:+l.opening,sec:l.sec||'vc'}));S.lines=LL.filter(l=>l.sec=='vc');S.igs=LL.filter(l=>l.sec=='ig');S.fwm=LL.filter(l=>l.sec=='fw');S.fw=e.error?[]:e.data.map(x=>({line:x.line_id,day:x.day,opening:+x.opening,closing:x.closing==null?null:+x.closing}));if(ME.role=='shop'){const r=await sb.rpc('list_staff');S.staff=r.data||[]}
  S.tx=d.data.map(x=>({id:x.id,t:new Date(x.created_at).getTime(),sec:x.sec,line:x.line_id,dir:x.dir,amt:+x.amt,fee:+x.fee,ded:+x.ded,cap:x.cap||undefined,adj:x.adj||undefined,auto:x.auto||undefined,ref:x.ref,note:esc(x.note)}))}
 const dl=(n,o)=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(o)],{type:'application/json'}));a.download=n;a.click()};
 const today=()=>new Date().toISOString().slice(0,10);
@@ -200,12 +216,12 @@ async function adminView(){hd.style.display='none';const L=(await q(sb.rpc('admi
 async function addShop(e){e.preventDefault();const fm=e.target;await q(sb.rpc('admin_add_shop',{p_name:fm.n.value.trim(),p_email:fm.e.value.trim()}));adminView();return false}
 async function saveShop(e,id){e.preventDefault();const f=e.target;await q(sb.from('shops').update({active:f.a.checked}).eq('id',id));await q(sb.from('shop_limits').update({limit_day:+f.d.value,limit_month:+f.m.value,fee_low:+f.lo.value,fee_th:+f.th.value,fee_rate:+f.r.value,fee_step:+f.s.value,ded_rate:+f.x.value}).eq('shop_id',id));adminView();return false}
 async function boot(){hd.style.display='none';const{data:{session}}=await sb.auth.getSession();if(!session)return loginView();
- const r=await sb.rpc('me');ME=r.data;if(!ME||!ME.role)return msg('الحساب مش مربوط بمحل. كلّم الإدارة.');
+ let r=await sb.rpc('me2');if(r.error)r=await sb.rpc('me');ME=r.data;if(!ME||!ME.role)return msg('الحساب مش مربوط بمحل. كلّم الإدارة.');
  if(ME.role=='admin')return adminView();if(!ME.active)return msg('الخدمة موقوفة على المحل ده. كلّم الإدارة.');
- await load();hd.style.display='';render();focusAmt()}
-const sig=()=>JSON.stringify([S.lim,S.fee,S.ded,S.lines,S.tx,S.ig,S.cash]);
+ await load();if(!M()&&S.tab=='jd')S.tab='vc';shop.contentEditable=M()?'true':'false';hd.style.display='';render();focusAmt()}
+const sig=()=>JSON.stringify([S.lim,S.fee,S.ded,S.lines,S.igs,S.fwm,S.fw,S.tx,S.cash]);
 let lt=0;addEventListener('touchstart',()=>{lt=Date.now()},{passive:true});
-setInterval(async()=>{if(!ME||ME.role!='shop'||!ME.active||document.hidden||S.edit||Date.now()-lt<15000||document.activeElement.matches('input,select,[contenteditable]'))return;const a=sig();await load();if(sig()!==a)render()},30000);
+setInterval(async()=>{if(!ME||!['shop','staff'].includes(ME.role)||!ME.active||document.hidden||S.edit||Date.now()-lt<15000||document.activeElement.matches('input,select,[contenteditable]'))return;const a=sig();await load();if(sig()!==a)render()},30000);
 boot();
 </script>
 </body>
