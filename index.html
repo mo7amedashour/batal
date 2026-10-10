@@ -11,7 +11,7 @@
 :root[data-theme="dark"]{--bg:#170d0e;--card:#241617;--tx:#f3e9ea;--mut:#b39da0;--priT:#fff;--bd:#3d2a2c;--ok:#6fdc9f;--okb:#12392a;--wn:#ffd36b;--wnb:#3d3010;--bd2:#ff9a9d;--bdb:#431a1c;--p-vc:#d90f14;--p-ig:#8e44c4;--p-cash:#178a49;--p-net:#4f5260}
 :root[data-theme="light"]{color-scheme:light}:root[data-theme="dark"]{color-scheme:dark}
 :root[data-sec="ig"]{--pri:var(--p-ig)}:root[data-sec="cash"]{--pri:var(--p-cash)}:root[data-sec="net"],:root[data-sec="jd"]{--pri:var(--p-net)}:root[data-sec="fw"]{--pri:#c26a00}:root[data-sec="aj"]{--pri:#1f5fa8}
-html{-webkit-text-size-adjust:100%}
+:root[data-sec="ig"]{--pri:var(--p-ig)}:root[data-sec="cash"]{--pri:var(--p-cash)}:root[data-sec="net"],:root[data-sec="jd"]{--pri:var(--p-net)}:root[data-sec="aj"]{--pri:#1f5fa8}:root[data-sec="fw"]{--pri:#f5c400;--priT:#1a1a1a}p.mut,form+div.mut{display:none} html{-webkit-text-size-adjust:100%}
 html,body{margin:0;height:auto;background:var(--bg);color:var(--tx);font-family:Tajawal,Tahoma,"Segoe UI",sans-serif;font-size:16px}
 button,input,select{touch-action:manipulation}
 header{background:var(--card);border-bottom:3px solid var(--pri);padding:10px 16px;display:flex;gap:16px;align-items:center;flex-wrap:wrap}
@@ -222,7 +222,7 @@ async function boot(){hd.style.display='none';const{data:{session}}=await sb.aut
 const sig=()=>JSON.stringify([S.lim,S.fee,S.ded,S.lines,S.igs,S.fwm,S.fw,S.tx,S.cash]);
 let lt=0;addEventListener('touchstart',()=>{lt=Date.now()},{passive:true});
 setInterval(async()=>{if(!ME||!['shop','staff'].includes(ME.role)||!ME.active||document.hidden||S.edit||Date.now()-lt<15000||document.activeElement.matches('input,select,[contenteditable]'))return;const a=sig();await load();if(sig()!==a)render()},30000);
-boot();
+async function logout(){await sb.auth.signOut();location.reload()}boot();
 </script>
 </body>
 </html>
