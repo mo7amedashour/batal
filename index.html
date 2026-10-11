@@ -4,7 +4,7 @@
 <head>
 <script>
 (function(){
-var VER='2026-10-12-d1',LOG=[],T0=Date.now();
+var VER='2026-10-12-d2',LOG=[],T0=Date.now();
 function ts(){var d=new Date();return d.toTimeString().slice(0,8)}
 function L(m){LOG.push(ts()+'  '+m);if(LOG.length>120)LOG.shift();var p=document.getElementById('dgPre');if(p)p.textContent=LOG.join('\n')}
 window.__L=L;
@@ -91,7 +91,7 @@ th,td{padding:9px 8px;text-align:center;border-bottom:1px solid var(--bd);white-
 <footer style="text-align:center;color:var(--mut);font-size:12px;padding:18px">تدوين · تطوير محمد عاشور</footer>
 <script>
 const SB_URL='https://pzqifkaggvilzalnhaqt.supabase.co',SB_KEY='sb_publishable_z4W0iWdrogr2a76_A-6XIQ_eBtadqgo';
-const sb=supabase.createClient(SB_URL,SB_KEY);let ME=null,S={tab:'vc',per:'d',lines:[],igs:[],fwm:[],fw:[],staff:[],cur:0,curIg:0,tx:[],cash:0,lim:{d:60000,m:200000},fee:{lo:5,th:1000,r:1,s:5},ded:0.1,edit:null};
+const sb=supabase.createClient(SB_URL,SB_KEY,{auth:{lock:async(n,t,f)=>await f()}});let ME=null,S={tab:'vc',per:'d',lines:[],igs:[],fwm:[],fw:[],staff:[],cur:0,curIg:0,tx:[],cash:0,lim:{d:60000,m:200000},fee:{lo:5,th:1000,r:1,s:5},ded:0.1,edit:null};
 const save=()=>{};
 const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const TH=['auto','light','dark'],TL={auto:'🌓 تلقائي',light:'☀️ فاتح',dark:'🌙 داكن'};
@@ -249,7 +249,8 @@ async function adminView(){hd.style.display='none';const L=(await q(sb.rpc('admi
  ${L.map(s=>`<div class="card"><form onsubmit="return saveShop(event,'${s.id}')"><div class="row"><b>${esc(s.name)}</b><span class="mut">${esc(s.email)}</span><label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" name="a" ${s.active?'checked':''} style="min-width:0">شغّال</label><button type="button" class="ghost" onclick="adminBackupOne('${s.id}')">نسخة</button><label class="ghost" style="cursor:pointer;flex-direction:row">استرجاع<input type="file" accept=".json" style="display:none" onchange="adminRestore('${s.id}',this)"></label></div><div class="row" style="margin-top:10px">${[['d','ليميت يومي',s.limit_day],['m','ليميت شهري',s.limit_month],['lo','رسوم تحت الحد',s.fee_low],['th','الحد',s.fee_th],['r','نسبة الرسوم %',s.fee_rate],['s','تقريب لأعلى',s.fee_step],['x','خصم الشركة %',s.ded_rate]].map(([k,l,v])=>`<label>${l}<input name="${k}" type="text" inputmode="decimal" step="any" value="${esc(v)}"></label>`).join('')}<button class="go">حفظ</button></div></form></div>`).join('')}`}
 async function addShop(e){e.preventDefault();const fm=e.target;await q(sb.rpc('admin_add_shop',{p_name:fm.n.value.trim(),p_email:fm.e.value.trim()}));adminView();return false}
 async function saveShop(e,id){e.preventDefault();const f=e.target;await q(sb.from('shops').update({active:f.a.checked}).eq('id',id));await q(sb.from('shop_limits').update({limit_day:+f.d.value,limit_month:+f.m.value,fee_low:+f.lo.value,fee_th:+f.th.value,fee_rate:+f.r.value,fee_step:+f.s.value,ded_rate:+f.x.value}).eq('shop_id',id));adminView();return false}
-async function boot(){hd.style.display='none';const{data:{session}}=await sb.auth.getSession();if(!session)return loginView();
+function resetSess(){try{Object.keys(localStorage).filter(k=>/^sb-/.test(k)).forEach(k=>localStorage.removeItem(k))}catch(e){}location.reload()}
+async function boot(){hd.style.display='none';const gs=await Promise.race([sb.auth.getSession(),new Promise(ok=>setTimeout(()=>ok(null),8000))]);if(!gs){window.__L&&__L('boot: الجلسة علّقت 8 ثواني');return msg('الجلسة معلّقة. اقفل باقي تابات الموقع أو دوس الزرار ده<br><br><button class="go" onclick="resetSess()">إعادة تسجيل الدخول</button>')}const{data:{session}}=gs;if(!session)return loginView();
  let r=await sb.rpc('me2');if(r.error)r=await sb.rpc('me');ME=r.data;if(!ME||!ME.role)return msg('الحساب مش مربوط بمحل. كلّم الإدارة.');
  if(ME.role=='admin')return adminView();if(!ME.active)return msg('الخدمة موقوفة على المحل ده. كلّم الإدارة.');
  await load();if(!M()&&S.tab=='jd')S.tab='vc';shop.contentEditable=M()?'true':'false';hd.style.display='';render();focusAmt()}
@@ -275,4 +276,4 @@ async function ajAdd(e){e.preventDefault();if(busy)return false;const fm=e.targe
 async function ajAct(e,i){e.preventDefault();if(busy)return false;const fm=e.target,a=+fm.amt.value,x=ajBal()[i],m=S.aq&&S.aq.m;if(!(a>0)||!x||!m)return false;if(m=='s'&&a>Math.abs(x.b)+.001){alert('مبلغ التسديد أكبر من المتبقي');return false}const d=(x.b>0)==(m=='a')?'in':'out';if(!ajOk(d,a,fm.src.value))return false;busy=true;try{await ajRec(un(x.n),d,a,fm.src.value,x.b<0?0:fm.fee.value);S.aq=null;await load();render()}finally{busy=false}return false}
 ajView=function(){const B=ajBal(),my=B.filter(x=>x.b>0).reduce((a,x)=>a+x.b,0),on=-B.filter(x=>x.b<0).reduce((a,x)=>a+x.b,0),Q=S.aq,run={},H=[],hi="if(event.target.name=='fee')this.fee.dataset.m=1;ajHint(this)";
  S.tx.filter(x=>x.sec=='ajil').forEach(x=>{const k=x.note||'-',p=run[k]||0,d=x.dir=='in'?x.amt:-x.amt;run[k]=p+d;H.push({...x,l:p==0?'جديد':p*d<0?'تسديد':'زيادة'})});
- const rows=B.map((x,i)=>{const d=(x.b>0)==(Q&&Q.m=='a')?'in':'out';return`<tr><td><b>${x.n}</b></td><td class="${x.b<0?'neg':''}">${x.b>0?'لينا عنده ':x.b<0?'علينا له ':'مسدّد'}${x.b?f(Math.abs(x.b)):''}</td><td>${x.b?`<button class="ghost" onclick="S.aq={i:${i},m:'s'};render()">تسديد</button> <button class="ghost" onclick="S.aq={i:${i},m:'a'};render()">زيادة</button>`:''}</td></tr>`+(Q&&Q.i==i?`<tr><td colspan="3"><form data-nf="${x.b<0?1:0}" onsubmit="return ajAct(event,${i})" oninput="${hi}"><input type="hidden" name="dd" value="${d}"><div class="row"><label>${Q.m=='s'?'مبلغ التسديد':'مبلغ الزيادة'}<input name="amt" type="text" inputmode="decimal" min="0
+ const rows=B.map((x,i)=>{const d=(x.b>0)==(Q&&Q.m=='a')?'in':'out';return`<tr><td><b>${x.n}</b></td><td class="${x.b<0?'neg':''}">${x.b>0?'لينا عنده ':x.b<0?'علينا له ':'مسدّد'}${x.b?f(Math.abs(x.b)):''}</td>
